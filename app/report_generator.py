@@ -29,9 +29,9 @@ def generar_reporte(
         tabla = doc.add_table(rows=4, cols=num_cols)
 
         # Primera columna: nombres fijos de las filas
-        tabla.cell(0, 0).text = "N° de HC evaluada"
-        tabla.cell(1, 0).text = "Fecha de atención evaluada"
-        tabla.cell(2, 0).text = "% cumplimiento"
+        tabla.cell(0, 0).text = "CODIFICACIÓN DE LA HISTORIA CLÍNICA"
+        tabla.cell(1, 0).text = "FECHA DE LA ATENCIÓN BRINDADA"
+        tabla.cell(2, 0).text = "PORCENTAJE DE CUMPLIMIENTO ALCANZADO"
         tabla.cell(3, 0).text = "Calificación del registro"
 
         # Rellenar columnas de datos

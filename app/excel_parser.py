@@ -20,6 +20,30 @@ def _normalizar(texto: str) -> str:
     return " ".join(sin_tildes.upper().split())
 
 
+def _encontrar_hoja_correcta(wb):
+    """
+    Busca en todas las hojas del workbook la que contenga el texto
+    'FORMATO DE EVALUACIÓN DE LA CALIDAD DE REGISTO EN CONSULTA EXTERNA'
+    (con o sin tildes)
+    """
+    texto_buscar = "FORMATO DE EVALUACION DE LA CALIDAD DE REGISTO EN CONSULTA EXTERNA"
+    
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        
+        # Buscar en las primeras filas (usualmente el título está arriba)
+        for row in range(1, min(20, ws.max_row + 1)):  # Buscar en las primeras 20 filas
+            for col in range(1, min(10, ws.max_column + 1)):  # Primeras 10 columnas
+                cell_value = ws.cell(row=row, column=col).value
+                if cell_value:
+                    texto_normalizado = _normalizar(cell_value)
+                    # Verificar si contiene las palabras clave
+                    if "FORMATO" in texto_normalizado and "EVALUACION" in texto_normalizado and "CALIDAD" in texto_normalizado:
+                        return ws
+    
+    return None
+
+
 def parse_auditoria_excel(path: Path) -> Dict[str, List[str]]:
     """
     Lee un Excel con el formato de auditoría y devuelve los datos
@@ -32,7 +56,15 @@ def parse_auditoria_excel(path: Path) -> Dict[str, List[str]]:
       - calificaciones: lista de calificación del registro
     """
     wb = load_workbook(path, data_only=True)
-    ws = wb.active
+    
+    # Buscar la hoja correcta
+    ws = _encontrar_hoja_correcta(wb)
+    
+    if ws is None:
+        raise ValueError(
+            f"No se encontró la hoja con el formato esperado en {path.name}. "
+            f"Se buscó una hoja que contenga 'FORMATO DE EVALUACIÓN DE LA CALIDAD DE REGISTO EN CONSULTA EXTERNA'"
+        )
 
     fila_hc = fila_fecha = fila_porc = fila_calif = None
 
@@ -51,12 +83,16 @@ def parse_auditoria_excel(path: Path) -> Dict[str, List[str]]:
             fila_fecha = row
         elif "% CUMPL" in txt or "PORCENTAJE DE CUMPLIMIENTO" in txt:
             fila_porc = row
-        elif "CALIFICACION" in txt and "REGISTRO" in txt:
+        elif "PUNTAJE " in txt or "TOTAL OBTENIDO EN LA E" in txt:
             fila_calif = row
 
     if None in (fila_hc, fila_fecha, fila_porc, fila_calif):
         raise ValueError(
-            f"No se encontraron todas las filas (HC, fecha, %, calificación) en {path.name}"
+            f"No se encontraron todas las filas requeridas en {path.name}. "
+            f"Encontradas - HC: {'✓' if fila_hc else '✗'}, "
+            f"Fecha: {'✓' if fila_fecha else '✗'}, "
+            f"Porcentaje: {'✓' if fila_porc else '✗'}, "
+            f"Calificación: {'✓' if fila_calif else '✗'}"
         )
 
     # Tomamos los datos desde la columna 3 hacia la derecha
