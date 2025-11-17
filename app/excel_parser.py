@@ -57,6 +57,9 @@ def parse_auditoria_excel(path: Path) -> Dict[str, List[str]]:
     """
     wb = load_workbook(path, data_only=True)
     
+    print(f"\n=== Procesando archivo: {path.name} ===")
+    print(f"Hojas disponibles: {wb.sheetnames}")
+    
     # Buscar la hoja correcta
     ws = _encontrar_hoja_correcta(wb)
     
@@ -65,26 +68,50 @@ def parse_auditoria_excel(path: Path) -> Dict[str, List[str]]:
             f"No se encontró la hoja con el formato esperado en {path.name}. "
             f"Se buscó una hoja que contenga 'FORMATO DE EVALUACIÓN DE LA CALIDAD DE REGISTO EN CONSULTA EXTERNA'"
         )
+    
+    print(f"✓ Hoja encontrada: {ws.title}")
 
     fila_hc = fila_fecha = fila_porc = fila_calif = None
+    col_inicio = None
 
-    # Buscamos en la columna B (columna 2) los textos clave
-    for row in range(1, ws.max_row + 1):
-        raw_value = ws.cell(row=row, column=2).value
-        txt = _normalizar(raw_value)
+    print("\nBuscando las 4 filas clave en TODO el Excel...")
+    # Buscar en todas las celdas las filas que contienen estos textos
+    for row in range(1, min(200, ws.max_row + 1)):
+        for col in range(1, min(20, ws.max_column + 1)):
+            raw_value = ws.cell(row=row, column=col).value
+            txt = _normalizar(raw_value)
 
-        if not txt:
-            continue
+            if not txt:
+                continue
 
-        # Hacemos las condiciones más flexibles
-        if "CODIFICACION" in txt and "HISTORIA" in txt:
-            fila_hc = row
-        elif "FECHA" in txt and "ATENCION" in txt:
-            fila_fecha = row
-        elif "% CUMPL" in txt or "PORCENTAJE DE CUMPLIMIENTO" in txt:
-            fila_porc = row
-        elif "PUNTAJE " in txt or "TOTAL OBTENIDO EN LA E" in txt:
-            fila_calif = row
+            # Mostrar las primeras celdas para debug
+            if row <= 100 and col <= 3:
+                print(f"  Fila {row}, Col {col}: {raw_value}")
+
+            # Buscar exactamente estos textos
+            if "N" in txt and "HC" in txt and "EVALUADA" in txt:
+                fila_hc = row
+                if col_inicio is None:
+                    col_inicio = col
+                print(f"  ✓✓✓ Fila HC encontrada en: fila={row}, col={col}")
+            
+            if "FECHA" in txt and "ATENCION" in txt and "EVALUADA" in txt:
+                fila_fecha = row
+                if col_inicio is None:
+                    col_inicio = col
+                print(f"  ✓✓✓ Fila FECHA encontrada en: fila={row}, col={col}")
+            
+            if "%" in txt and "CUMPLIMIENTO" in txt:
+                fila_porc = row
+                if col_inicio is None:
+                    col_inicio = col
+                print(f"  ✓✓✓ Fila PORCENTAJE encontrada en: fila={row}, col={col}")
+            
+            if "CALIFICACION" in txt and "REGISTRO" in txt:
+                fila_calif = row
+                if col_inicio is None:
+                    col_inicio = col
+                print(f"  ✓✓✓ Fila CALIFICACIÓN encontrada en: fila={row}, col={col}")
 
     if None in (fila_hc, fila_fecha, fila_porc, fila_calif):
         raise ValueError(
@@ -95,18 +122,31 @@ def parse_auditoria_excel(path: Path) -> Dict[str, List[str]]:
             f"Calificación: {'✓' if fila_calif else '✗'}"
         )
 
-    # Tomamos los datos desde la columna 3 hacia la derecha
-    col = 3
+    print(f"\n✓ Todas las filas encontradas:")
+    print(f"  HC en fila: {fila_hc}")
+    print(f"  Fecha en fila: {fila_fecha}")
+    print(f"  Porcentaje en fila: {fila_porc}")
+    print(f"  Calificación en fila: {fila_calif}")
+    print(f"  Columna de inicio (títulos): {col_inicio}")
+
+    # Los datos empiezan en la siguiente columna después de los títulos
+    col_datos = col_inicio + 1 if col_inicio else 2
+
+    # Tomamos los datos desde la columna siguiente a los títulos
+    col = col_datos
     hc_list: List[str] = []
     fecha_list: List[str] = []
     porc_list: List[str] = []
     calif_list: List[str] = []
 
+    print(f"\nExtrayendo datos desde la columna {col_datos}...")
     while col <= ws.max_column:
         hc_val = ws.cell(row=fila_hc, column=col).value
         fecha_val = ws.cell(row=fila_fecha, column=col).value
         porc_val = ws.cell(row=fila_porc, column=col).value
         calif_val = ws.cell(row=fila_calif, column=col).value
+
+        print(f"  Columna {col}: HC={hc_val}, Fecha={fecha_val}, %={porc_val}, Calif={calif_val}")
 
         # Si ya no hay HC, asumimos que se acabaron las columnas útiles
         if hc_val in (None, ""):
@@ -126,6 +166,12 @@ def parse_auditoria_excel(path: Path) -> Dict[str, List[str]]:
         calif_list.append("" if calif_val is None else str(calif_val).strip())
 
         col += 1
+
+    print(f"\n✓ Datos extraídos:")
+    print(f"  - {len(hc_list)} historias clínicas: {hc_list}")
+    print(f"  - Fechas: {fecha_list}")
+    print(f"  - Porcentajes: {porc_list}")
+    print(f"  - Calificaciones: {calif_list}")
 
     return {
         "hc": hc_list,
