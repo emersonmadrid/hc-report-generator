@@ -3,6 +3,7 @@ venv/
 ENV/
 env/
 
+
 # Cachés de Python
 __pycache__/
 *.pyc
@@ -22,3 +23,5 @@ build/
 
 # Archivos temporales
 *.log
+uploads/
+*.docx
