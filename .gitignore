@@ -24,4 +24,4 @@ build/
 # Archivos temporales
 *.log
 uploads/
-*.docx
+reporte_generado.docx
